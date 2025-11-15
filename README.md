@@ -1,15 +1,6 @@
 # HealthFlow: A Self-Evolving AI Agent with Meta Planning for Autonomous Healthcare Research
 
-[![arXiv](https://img.shields.io/badge/arXiv-2508.02621-b31b1b.svg)](https://arxiv.org/abs/2508.02621)
-[![Project Website](https://img.shields.io/badge/Project%20Website-HealthFlow-0066cc.svg)](https://healthflow-agent.netlify.app)
-
-**[📜 Read our ArXiv Paper](https://arxiv.org/abs/2508.02621)**
-
-> **Authors:** Yinghao Zhu¹²*, Yifan Qi¹*, Zixiang Wang¹, Lei Gu¹, Dehao Sui¹, Haoran Hu¹, Xichen Zhang², Ziyi He², Liantao Ma¹†, Lequan Yu²†
->
-> ¹Peking University, ²The University of Hong Kong
->
-> *(\* Equal contribution, † Corresponding authors)*
+**COMP9501 2025 Fall Group Project**
 
 ---
 
@@ -25,9 +16,6 @@ The system treats every task as a scientific experiment, autonomously refining i
 -   **Unified Workflow**: A consistent and powerful `Plan -> Execute -> Evaluate -> Reflect` cycle that handles all tasks, from simple questions to complex, multi-step data analysis.
 
 ## 🚀 How It Works: The Self-Evolving Loop
-
-![HealthFlow Workflow](assets/healthflow_workflow.png)
-*Figure: The self-evolving workflow of HealthFlow, which treats every task as a learning opportunity. The cycle consists of four key stages: **Plan**, **Execute**, **Evaluate**, and **Reflect**, with successful experiences synthesized and saved to a durable knowledge base to **Evolve** the agent's future planning capabilities.*
 
 HealthFlow's novelty lies in its unified and automated **Plan -> Execute -> Evaluate -> Reflect -> Evolve** cycle. It treats every task as a learning opportunity, enabling it to continuously improve its own strategic capabilities.
 
@@ -53,13 +41,13 @@ HealthFlow's novelty lies in its unified and automated **Plan -> Execute -> Eval
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/healthflow.git
-cd healthflow
+git clone https://github.com/yhzhu99/COMP9501-Final-Project.git
+cd COMP9501-Final-Project
 
 # 2. Install dependencies using uv
 uv sync
 
-# 3. Activate the virtual environment
+# 3.
 source .venv/bin/activate
 
 # 4. Create your configuration file from the example
@@ -138,19 +126,3 @@ All settings are managed in `config.toml`.
 -   **`[system]`**: Configure system-wide behavior like `max_retries` and the `workspace_dir`.
 -   **`[evaluation]`**: Set the `success_threshold` score for a task to be considered successful.
 -   **`[logging]`**: Control the log level and file path.
-
-## 📜 Citation
-
-If you use HealthFlow in your research, please cite our paper:
-
-```bibtex
-@misc{zhu2025healthflow,
-      title={HealthFlow: A Self-Evolving AI Agent with Meta Planning for Autonomous Healthcare Research}, 
-      author={Yinghao Zhu and Yifan Qi and Zixiang Wang and Lei Gu and Dehao Sui and Haoran Hu and Xichen Zhang and Ziyi He and Liantao Ma and Lequan Yu},
-      year={2025},
-      eprint={2508.02621},
-      archivePrefix={arXiv},
-      primaryClass={cs.AI},
-      url={https://arxiv.org/abs/2508.02621}, 
-}
-```
