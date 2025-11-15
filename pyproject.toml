@@ -1,0 +1,25 @@
+[project]
+name = "HealthFlow"
+version = "0.1.0"
+description = "Self-Evolving LLM Agent for Healthcare with Experience Accumulation and Tool Creation"
+readme = "README.md"
+requires-python = ">=3.14"
+keywords = ["healthcare", "ai", "llm", "agents", "self-evolving", "medical", "agentic"]
+
+dependencies = [
+    "aiofiles>=24.1.0",
+    "loguru>=0.7.3",
+    "openai>=1.97.1",
+    "pydantic>=2.11.7",
+    "rich>=14.1.0",
+    "tenacity>=9.1.2",
+    "toml>=0.10.2",
+    "typer>=0.16.0",
+]
+
+[project.scripts]
+healthflow = "run_healthflow:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

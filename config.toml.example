@@ -1,0 +1,34 @@
+# HealthFlow Configuration
+
+# LLM Provider Configurations
+# All agents and the shared LLMTaskEvaluator use the same provider for consistency
+
+[llm.openai]
+base_url = "https://api.openai.com/v1"
+api_key = "YOUR_OPENAI_API_KEY"
+model_name = "gpt-4-turbo-preview"
+
+[llm.deepseek-v3]
+base_url = "https://api.deepseek.com/v1"
+api_key = "YOUR_DEEPSEEK_API_KEY"
+model_name = "deepseek-chat"
+
+[llm.deepseek-r1]
+base_url = "https://api.deepseek.com/v1"
+api_key = "YOUR_DEEPSEEK_API_KEY"
+model_name = "deepseek-reasoner"
+
+# --- System Configuration ---
+[system]
+max_retries = 2 # Maximum number of retries for a failing task
+workspace_dir = "workspace" # The directory to store all task-related artifacts and the experience knowledge base
+shell = "/usr/bin/zsh" # Shell to use for subprocess execution (e.g., /usr/bin/bash, /usr/bin/zsh)
+
+# --- Evaluation Configuration ---
+[evaluation]
+success_threshold = 6.0 # Score threshold (out of 10) to consider a task successful
+
+# --- Logging Configuration ---
+[logging]
+log_level = "INFO" # Log level: DEBUG, INFO, WARNING, ERROR
+log_file = "healthflow.log" # Path to the log file
