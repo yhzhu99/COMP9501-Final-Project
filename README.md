@@ -76,7 +76,7 @@ If you prefer the command-line interface, you can use the CLI directly. HealthFl
 To execute a single, specific task and then exit.
 
 ```bash
-python run_healthflow.py run "Analyze the provided 'patients.csv' to identify the top 3 risk factors for readmission. Anonymize any patient identifiers in the output." --active-llm deepseek-v3
+python run_healthflow.py run "Analyze the provided 'patients.csv' to identify the top 3 risk factors for readmission. Anonymize any patient identifiers in the output." --active-llm deepseek-chat
 ```
 
 #### Interactive Mode
@@ -84,7 +84,7 @@ python run_healthflow.py run "Analyze the provided 'patients.csv' to identify th
 For a chat-like session where you can run multiple tasks sequentially.
 
 ```bash
-python run_healthflow.py interactive --active-llm deepseek-v3
+python run_healthflow.py interactive --active-llm deepseek-chat
 ```
 
 #### Training (Knowledge Bootstrapping)
@@ -95,7 +95,7 @@ The training data should be a `.jsonl` file where each line is a JSON object wit
 
 ```bash
 # Format: python run_training.py <training_file> <dataset_name> --active-llm <llm>
-python run_training.py data/train_set.jsonl ehrflow_train --active-llm deepseek-r1
+python run_training.py data/train_set.jsonl ehrflow_train --active-llm deepseek-reasoner
 ```
 
 This will run each task, use the reference answer for evaluation, and save learned experiences to `workspace/experience.jsonl`. Detailed logs are saved to `benchmark_results/`.
@@ -106,7 +106,7 @@ Evaluate HealthFlow's performance on a benchmark dataset. The dataset format is 
 
 ```bash
 # Format: python run_benchmark.py <dataset_file> <dataset_name> --active-llm <llm>
-python run_benchmark.py data/benchmark_set.jsonl ehrflow_eval --active-llm deepseek-r1
+python run_benchmark.py data/benchmark_set.jsonl ehrflow_eval --active-llm deepseek-reasoner
 ```
 
 Results, including logs for each task and a final summary, will be saved in the `benchmark_results/` directory.
@@ -133,7 +133,7 @@ The project is designed to be modular and minimalist, serving as a clean researc
 
 All settings are managed in `config.toml`.
 
--   **`[llm.*]`**: Define connection details for different LLM providers (e.g., `[llm.deepseek-v3]`, `[llm.gemini]`). You must provide `base_url`, `api_key`, and `model_name`.
+-   **`[llm.*]`**: Define connection details for different LLM providers (e.g., `[llm.deepseek-chat]`, `[llm.gemini]`). You must provide `base_url`, `api_key`, and `model_name`.
 -   **`--active-llm <name>`**: This mandatory runtime flag tells HealthFlow which `[llm.*]` block from your `config.toml` to use for the reasoning agents.
 -   **`[system]`**: Configure system-wide behavior like `max_retries` and the `workspace_dir`.
 -   **`[evaluation]`**: Set the `success_threshold` score for a task to be considered successful.

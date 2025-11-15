@@ -309,7 +309,7 @@ def main():
     parser.add_argument("dataset_name", help="Name of the dataset (used for output directory structure)")
     parser.add_argument("--config", "-c", type=Path, default="config.toml", help="Path to the configuration file")
     parser.add_argument("--experience-path", type=Path, default="workspace/experience.jsonl", help="Path to the experience knowledge base file")
-    parser.add_argument("--active-llm", required=True, help="The active LLM to use (e.g., deepseek-v3, deepseek-r1, kimi-k2, gemini)")
+    parser.add_argument("--active-llm", required=True, help="The active LLM to use (e.g., deepseek-chat, deepseek-reasoner, kimi-k2, gemini)")
 
     args = parser.parse_args()
 
