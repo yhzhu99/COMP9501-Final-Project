@@ -2,9 +2,10 @@
 # Web UI for the HealthFlow Agentic System.
 
 import asyncio
-import re
+import json
 import toml
 from pathlib import Path
+from typing import Dict
 import streamlit as st
 
 # Ensure the project root is in the path to import healthflow modules
@@ -16,19 +17,13 @@ from healthflow.core.config import get_config, setup_logging, HealthFlowConfig, 
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="HealthFlow Agent UI",
+    page_title="HealthFlow Agent",
     page_icon="🌊",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# --- Helper Functions ---
-
-def get_llm_options_from_config(config_data):
-    """Parses the config file to get available LLM names."""
-    if "llm" in config_data:
-        return list(config_data["llm"].keys())
-    return []
+# --- Helper Functions & State Management ---
 
 @st.cache_resource
 def load_config_data():
@@ -36,190 +31,190 @@ def load_config_data():
     config_path = Path("config.toml")
     if config_path.exists():
         return toml.load(config_path)
-    # Fallback for deployed environment where config.toml might not exist
     st.warning("`config.toml` not found. Relying on Streamlit secrets for configuration.")
     return {}
 
+# Initialize session state variables
+if "running" not in st.session_state:
+    st.session_state.running = False
+if "task_result" not in st.session_state:
+    st.session_state.task_result = None
+
+def get_system_initializer():
+    """Returns the correct system initialization function based on environment."""
+    # IS_DEPLOYED checks if the 'llm' secret exists, a good proxy for cloud deployment
+    is_deployed = hasattr(st.secrets, 'llm') and 'llm' in st.secrets
+
+    if is_deployed:
+        st.session_state.is_deployed = True
+        return initialize_system_from_secrets
+    else:
+        st.session_state.is_deployed = False
+        return initialize_system_from_file
+
 def initialize_system_from_secrets(active_llm_name: str) -> HealthFlowSystem:
-    """
-    Initializes HealthFlowSystem using Streamlit's secrets management.
-    This is the preferred way for deployed apps.
-    """
+    """Initializes HealthFlowSystem using Streamlit's secrets for deployed apps."""
     try:
         llm_config_data = st.secrets.llm[active_llm_name]
         llm_config = LLMProviderConfig(**llm_config_data)
-
-        # Use default system/evaluation/logging configs or pull from secrets if defined
         system_config = SystemConfig(**st.secrets.get("system", {}))
         evaluation_config = EvaluationConfig(**st.secrets.get("evaluation", {}))
         logging_config = LoggingConfig(**st.secrets.get("logging", {"log_level": "INFO", "log_file": "healthflow_streamlit.log"}))
-
-        config = HealthFlowConfig(
-            active_llm_name=active_llm_name,
-            llm=llm_config,
-            system=system_config,
-            evaluation=evaluation_config,
-            logging=logging_config
-        )
+        config = HealthFlowConfig(active_llm_name=active_llm_name, llm=llm_config, system=system_config, evaluation=evaluation_config, logging=logging_config)
         setup_logging(config)
         return HealthFlowSystem(config=config, experience_path=Path(config.system.workspace_dir) / "experience.jsonl")
-    except KeyError:
-        st.error(f"Configuration for LLM '{active_llm_name}' not found in Streamlit secrets. Please check your secrets.toml.")
-        st.stop()
     except Exception as e:
-        st.error(f"Failed to initialize HealthFlow system from secrets: {e}")
+        st.error(f"Error initializing from secrets for LLM '{active_llm_name}': {e}")
         st.stop()
-
 
 def initialize_system_from_file(active_llm_name: str) -> HealthFlowSystem:
-    """
-
-    Initializes HealthFlowSystem from the local config.toml file.
-    Used for local development.
-    """
+    """Initializes HealthFlowSystem from local config.toml for development."""
     try:
-        config_path = Path("config.toml")
-        experience_path = Path("workspace/experience.jsonl")
-        config = get_config(config_path, active_llm_name)
+        config = get_config(Path("config.toml"), active_llm_name)
         setup_logging(config)
-        return HealthFlowSystem(config=config, experience_path=experience_path)
+        return HealthFlowSystem(config=config, experience_path=Path("workspace/experience.jsonl"))
     except Exception as e:
-        st.error(f"Failed to initialize HealthFlow system from config.toml: {e}")
+        st.error(f"Error initializing from config.toml: {e}")
         st.stop()
 
-def run_healthflow_task_async(system: HealthFlowSystem, task: str):
-    """
-    A wrapper to run the asynchronous HealthFlow task from Streamlit's
-    synchronous execution environment.
-    """
-    # Streamlit runs in a sync context. We need to run our async code
-    # in a new event loop.
-    return asyncio.run(system.run_task(task))
+def run_healthflow_task_async(system: HealthFlowSystem, task: str, uploaded_files: Dict[str, bytes]):
+    """Wrapper to run the async HealthFlow task from Streamlit's sync context."""
+    return asyncio.run(system.run_task(task, uploaded_files=uploaded_files))
 
+def read_file_from_workspace(workspace_path_str: str, file_glob: str) -> (str, str):
+    """Safely reads a file from the workspace directory, handling glob patterns."""
+    if not workspace_path_str:
+        return None, "Workspace path not available."
+    workspace = Path(workspace_path_str)
+    if not workspace.exists():
+        return None, f"Workspace directory not found at {workspace}"
 
-# --- Main Application UI ---
+    # Handle glob patterns like 'task_list_v*.md'
+    files = sorted(list(workspace.glob(file_glob)), reverse=True)
+    if not files:
+        return None, f"No file matching '{file_glob}' found in workspace."
 
-st.title("🌊 HealthFlow: Autonomous AI for Healthcare Research")
-st.markdown("Welcome to HealthFlow. Enter a complex healthcare research task below, and the AI agent will autonomously generate and execute a plan to find the answer.")
+    file_path = files[0] # Get the latest version if multiple
+    try:
+        return file_path.name, file_path.read_text(encoding="utf-8")
+    except Exception as e:
+        return file_path.name, f"Error reading file: {e}"
 
-# --- Sidebar for Configuration ---
+# --- UI Rendering ---
+
+# --- Sidebar ---
 with st.sidebar:
     st.header("⚙️ Configuration")
+    initializer = get_system_initializer()
 
-    # Determine if running on Streamlit Cloud (where secrets are available)
-    IS_DEPLOYED = hasattr(st.secrets, 'llm')
-
-    if IS_DEPLOYED:
-        # In deployed environment, get LLM options from secrets
-        llm_options = list(st.secrets.llm.keys())
-        st.info("Running in Cloud mode. Configuration is loaded from Streamlit secrets.")
+    if st.session_state.is_deployed:
+        llm_options = list(st.secrets.llm.keys()) if 'llm' in st.secrets else []
+        st.info("☁️ Cloud Mode: Config from Streamlit secrets.")
     else:
-        # In local environment, get LLM options from config.toml
         config_data_local = load_config_data()
-        llm_options = get_llm_options_from_config(config_data_local)
-        st.info("Running in Local mode. Configuration is loaded from `config.toml`.")
+        llm_options = list(config_data_local.get("llm", {}).keys())
+        st.info("💻 Local Mode: Config from `config.toml`.")
 
     if not llm_options:
-        st.error("No LLM configurations found. Please add them to your `config.toml` or Streamlit secrets.")
+        st.error("No LLM configurations found!")
         st.stop()
 
-    active_llm = st.selectbox(
-        "Select Reasoning LLM",
-        options=llm_options,
-        index=0,
-        help="Choose the Large Language Model that will be used for planning, evaluation, and reflection."
-    )
-
+    active_llm = st.selectbox("Select Reasoning LLM", options=llm_options)
     st.markdown("---")
-    st.markdown(
-        "Built for the COMP9501 Final Group Project."
-    )
+    st.caption("A Self-Evolving Meta-System for Agentic Healthcare AI.")
+    st.markdown("For **COMP9501 Final Group Project**")
+    st.markdown("[GitHub Repository](https://github.com/yhzhu99/COMP9501-Final-Project)") # <-- UPDATE YOUR REPO LINK
 
+# --- Main Page ---
+st.title("🌊 HealthFlow Agent")
+st.markdown("An autonomous AI agent that formulates and executes plans to solve complex healthcare research tasks.")
 
-# --- Main Content Area ---
+# --- Input Area ---
+st.subheader("1. Define Your Task")
+task_input = st.text_area(
+    "Describe the research task you want the agent to perform:",
+    height=125,
+    placeholder="e.g., Analyze the uploaded patient data to identify the top 3 risk factors for readmission.",
+    disabled=st.session_state.running,
+)
 
-# Use session state to store the task and result between reruns
-if 'task_result' not in st.session_state:
+st.subheader("2. Upload Data (Optional)")
+uploaded_files = st.file_uploader(
+    "Upload CSV, JSON, or text files for the agent to use.",
+    type=["csv", "json", "txt", "md"],
+    accept_multiple_files=True,
+    disabled=st.session_state.running,
+)
+
+st.subheader("3. Run Agent")
+if st.button("🚀 Start Agent Execution", type="primary", disabled=st.session_state.running or not task_input):
+    st.session_state.running = True
     st.session_state.task_result = None
 
-# Input form
-with st.form("task_form"):
-    task_input = st.text_area(
-        "Enter your research task:",
-        height=150,
-        placeholder="e.g., Analyze the provided 'patients.csv' to identify the top 3 risk factors for readmission. Anonymize any patient identifiers in the output."
-    )
-    submit_button = st.form_submit_button(label="Run HealthFlow Agent")
-
-if submit_button and task_input:
-    # Clear previous results and run the new task
-    st.session_state.task_result = None
+    files_to_upload = {f.name: f.getvalue() for f in uploaded_files} if uploaded_files else {}
 
     with st.spinner("HealthFlow is orchestrating... This may take several minutes."):
         try:
-            # Initialize the system based on the environment
-            if IS_DEPLOYED:
-                system = initialize_system_from_secrets(active_llm)
-            else:
-                system = initialize_system_from_file(active_llm)
-
-            # Run the task
-            result = run_healthflow_task_async(system, task_input)
+            system = initializer(active_llm)
+            result = run_healthflow_task_async(system, task_input, files_to_upload)
             st.session_state.task_result = result
-            st.rerun() # Rerun the script to display the results below
         except Exception as e:
-            st.error(f"An unexpected error occurred: {e}")
-            st.exception(e) # Display full traceback for debugging
+            st.session_state.task_result = {"error": str(e), "success": False}
+            st.exception(e)
 
-# Display results if they exist in the session state
+    st.session_state.running = False
+    st.rerun()
+
+# --- Output Area ---
 if st.session_state.task_result:
-    result = st.session_state.task_result
     st.markdown("---")
-    st.header("Results")
+    st.header("Execution Results")
+    result = st.session_state.task_result
 
     if result.get("success"):
-        st.success("**Task Completed Successfully!**")
+        st.success("**Task Completed Successfully!**", icon="✅")
     else:
-        st.error("**Task Failed.**")
+        st.error(f"**Task Failed.**\n\nError: {result.get('error', result.get('final_summary', 'No specific error message.'))}", icon="❌")
 
-    # Display the final answer
-    st.subheader("Final Answer")
-    st.markdown(result.get("answer", "No answer was generated."))
+    workspace = result.get("workspace_path", "")
 
-    # Display details in an expander
-    with st.expander("Show Execution Details"):
-        st.subheader("Summary")
-        st.write(result.get("final_summary", "No summary available."))
+    # Create tabs for organized output
+    tab_answer, tab_log, tab_plan, tab_history, tab_summary = st.tabs([
+        "✅ Final Answer", "📄 Execution Log", "🗺️ Final Plan", "🔍 Full History", "📝 Summary"
+    ])
 
+    with tab_answer:
+        st.markdown(result.get("answer", "No answer was generated."))
+
+    with tab_log:
+        log_filename, log_content = read_file_from_workspace(workspace, "execution.log")
+        if log_filename:
+            st.code(log_content, language="log", line_numbers=True)
+        else:
+            st.warning(log_content)
+
+    with tab_plan:
+        plan_filename, plan_content = read_file_from_workspace(workspace, "task_list_v*.md")
+        if plan_filename:
+            st.markdown(f"**File:** `{plan_filename}`")
+            st.markdown(plan_content)
+        else:
+            st.warning(plan_content)
+
+    with tab_history:
+        history_filename, history_content = read_file_from_workspace(workspace, "full_history.json")
+        if history_filename:
+            try:
+                history_json = json.loads(history_content)
+                st.json(history_json)
+            except json.JSONDecodeError:
+                st.error("Could not parse full_history.json")
+                st.code(history_content, language="json")
+        else:
+            st.warning(history_content)
+
+    with tab_summary:
+        st.subheader("Final Outcome")
+        st.write(result.get('final_summary', 'No summary available.'))
         st.metric(label="Execution Time", value=f"{result.get('execution_time', 0):.2f} seconds")
-
-        workspace_path_str = result.get('workspace_path', '')
-        st.subheader("Workspace Artifacts")
-        st.code(workspace_path_str, language="bash")
-
-        # Try to list and display files from the workspace
-        if workspace_path_str:
-            workspace_path = Path(workspace_path_str)
-            if workspace_path.exists() and workspace_path.is_dir():
-                st.write("Files generated in the workspace:")
-                files_to_display = {
-                    "Execution Log": "execution.log",
-                    "Full History (JSON)": "full_history.json",
-                    "Final Plan": "task_list_v1.md" # Simple assumption, might need to find latest
-                }
-
-                for display_name, file_name in files_to_display.items():
-                    file_path = workspace_path / file_name
-                    # Handle versioned plans (e.g., task_list_v2.md)
-                    if "task_list" in file_name:
-                        plan_files = sorted(workspace_path.glob("task_list_v*.md"), reverse=True)
-                        if plan_files:
-                            file_path = plan_files[0]
-
-                    if file_path.exists():
-                        try:
-                            content = file_path.read_text(encoding="utf-8")
-                            st.text(f"--- {display_name} ({file_path.name}) ---")
-                            st.code(content, language="markdown" if ".md" in file_path.name else "json" if ".json" in file_path.name else "log")
-                        except Exception as e:
-                            st.warning(f"Could not read or display {file_path.name}: {e}")
+        st.info(f"All task artifacts are located in the following directory on the server:\n`{workspace}`")
